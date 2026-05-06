@@ -229,11 +229,11 @@
   }
 
   function getStatus(pm25) {
-    if (pm25 <= 25) return "ดี";
-    else if (pm25 <= 37.5) return "ปานกลาง";
-    else if (pm25 <= 75) return "มีผลต่อสุขภาพ";
-    else if (pm25 <= 150) return "มีผลต่อสุขภาพมาก";
-    else return "อันตราย";
+    if (pm25 <= 25) return "อากาศดีมาก";
+    else if (pm25 <= 37.5) return "อากาศดี";
+    else if (pm25 <= 75) return "ปลานกลาง";
+    else if (pm25 <= 150) return "มีผลต่อสุขภาพ";
+    else return "มีผลต่อสุขภาพมาก";
   }
 
   function getClass(pm25) {
