@@ -28,121 +28,210 @@
     .stat-label { font-size: 12px; color: #666; margin-top: 5px; }
     .chart-container { position: relative; height: 300px; }
     table { width: 100%; border-collapse: collapse; }
-    th { background: #667eea; color: white; padding: 10px; text-align: left; }
+    th { background: #667eea; color: white; padding: 10px; text-align: left; font-size: 14px; }
     td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
     tr:hover { background: #f5f5f5; }
     .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; margin: 5px; }
     .btn-export { background: #4CAF50; color: white; }
     .btn-refresh { background: #667eea; color: white; }
+    .btn-print { background: #FF9800; color: white; }
     .filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
-    select, input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-    .last-update { text-align: center; color: #666; font-size: 13px; margin-top: 10px; }
+    select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .tab-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab { padding: 10px 20px; border-radius: 8px; cursor: pointer; border: 2px solid #667eea; color: #667eea; font-size: 14px; background: white; }
+    .tab.active { background: #667eea; color: white; }
+
+    /* รายงานรายเดือน */
+    .monthly-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .monthly-table th { background: #667eea; color: white; padding: 10px; text-align: center; border: 1px solid #5567d5; }
+    .monthly-table td { padding: 8px; border: 1px solid #ddd; text-align: center; vertical-align: top; min-height: 60px; }
+    .monthly-table td.day-col { font-weight: bold; font-size: 18px; color: #667eea; width: 60px; }
+    .time-cell { font-size: 11px; color: #555; }
+    .time-cell .time-val { font-weight: bold; color: #333; font-size: 13px; }
+    .no-data { color: #ccc; font-size: 12px; }
+
+    @media print {
+      .no-print { display: none; }
+      .card { box-shadow: none; border: 1px solid #ddd; }
+    }
   </style>
 </head>
 <body>
 
-<div class="header">
+<div class="header no-print">
   <h1>🌫️ ระบบตรวจวัด PM2.5</h1>
   <p id="last-update">กำลังโหลดข้อมูล...</p>
 </div>
 
 <div class="container">
 
-  <!-- ค่าปัจจุบัน -->
-  <div class="card current-value">
-    <div class="pm25-number" id="current-pm25">--</div>
-    <div class="pm25-unit">μg/m³</div>
-    <div class="status-badge" id="current-status">กำลังโหลด...</div>
+  <!-- Tab เมนู -->
+  <div class="tab-row no-print">
+    <button class="tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+    <button class="tab" onclick="showTab('report')">📋 รายงานรายเดือน</button>
   </div>
 
-  <!-- สถิติ -->
-  <div class="card">
-    <h3 style="margin-bottom:15px">📊 สถิติวันนี้</h3>
-    <div class="stats">
-      <div class="stat-box">
-        <div class="stat-value" id="stat-max">--</div>
-        <div class="stat-label">สูงสุด (μg/m³)</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-value" id="stat-min">--</div>
-        <div class="stat-label">ต่ำสุด (μg/m³)</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-value" id="stat-avg">--</div>
-        <div class="stat-label">เฉลี่ย (μg/m³)</div>
+  <!-- ===== DASHBOARD TAB ===== -->
+  <div id="tab-dashboard">
+
+    <!-- ค่าปัจจุบัน -->
+    <div class="card current-value">
+      <div class="pm25-number" id="current-pm25">--</div>
+      <div class="pm25-unit">μg/m³</div>
+      <div class="status-badge good" id="current-status">กำลังโหลด...</div>
+    </div>
+
+    <!-- สถิติ -->
+    <div class="card">
+      <h3 style="margin-bottom:15px">📊 สถิติวันนี้</h3>
+      <div class="stats">
+        <div class="stat-box">
+          <div class="stat-value" id="stat-max">--</div>
+          <div class="stat-label">สูงสุด (μg/m³)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-min">--</div>
+          <div class="stat-label">ต่ำสุด (μg/m³)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="stat-avg">--</div>
+          <div class="stat-label">เฉลี่ย (μg/m³)</div>
+        </div>
       </div>
     </div>
+
+    <!-- กราฟ -->
+    <div class="card">
+      <h3 style="margin-bottom:15px">📈 กราฟย้อนหลัง</h3>
+      <div class="filter-row">
+        <select id="filter-range" onchange="filterData()">
+          <option value="24">24 ชั่วโมงล่าสุด</option>
+          <option value="48">48 ชั่วโมงล่าสุด</option>
+          <option value="168">7 วันล่าสุด</option>
+        </select>
+      </div>
+      <div class="chart-container">
+        <canvas id="pm25Chart"></canvas>
+      </div>
+    </div>
+
+    <!-- ตารางข้อมูล -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px">
+        <h3>📋 ข้อมูลย้อนหลัง</h3>
+        <div>
+          <button class="btn btn-refresh" onclick="loadData()">🔄 รีเฟรช</button>
+          <button class="btn btn-export" onclick="exportCSV()">📥 Export CSV</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>เวลา</th>
+              <th>PM2.5 (μg/m³)</th>
+              <th>ระดับ</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr><td colspan="3" style="text-align:center">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 
-  <!-- กราฟ -->
-  <div class="card">
-    <h3 style="margin-bottom:15px">📈 กราฟย้อนหลัง</h3>
-    <div class="filter-row">
-      <select id="filter-range" onchange="filterData()">
-        <option value="24">24 ชั่วโมงล่าสุด</option>
-        <option value="48">48 ชั่วโมงล่าสุด</option>
-        <option value="168">7 วันล่าสุด</option>
-      </select>
-    </div>
-    <div class="chart-container">
-      <canvas id="pm25Chart"></canvas>
-    </div>
-  </div>
-
-  <!-- ตารางข้อมูล + Export -->
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px">
-      <h3>📋 ข้อมูลย้อนหลัง</h3>
-      <div>
-        <button class="btn btn-refresh" onclick="loadData()">🔄 รีเฟรช</button>
-        <button class="btn btn-export" onclick="exportCSV()">📥 Export CSV</button>
-        <button class="btn btn-export" onclick="exportPDF()">📄 Export PDF</button>
+  <!-- ===== REPORT TAB ===== -->
+  <div id="tab-report" style="display:none">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px">
+        <h3>📋 รายงานรายเดือน</h3>
+        <div class="filter-row" style="margin:0">
+          <select id="report-month" onchange="renderReport()">
+            <option value="1">มกราคม</option>
+            <option value="2">กุมภาพันธ์</option>
+            <option value="3">มีนาคม</option>
+            <option value="4">เมษายน</option>
+            <option value="5">พฤษภาคม</option>
+            <option value="6">มิถุนายน</option>
+            <option value="7">กรกฎาคม</option>
+            <option value="8">สิงหาคม</option>
+            <option value="9">กันยายน</option>
+            <option value="10">ตุลาคม</option>
+            <option value="11">พฤศจิกายน</option>
+            <option value="12">ธันวาคม</option>
+          </select>
+          <span id="report-year" style="font-weight:bold; font-size:16px; color:#667eea"></span>
+          <button class="btn btn-print no-print" onclick="window.print()">🖨️ พิมพ์รายงาน</button>
+          <button class="btn btn-export no-print" onclick="exportCSV()">📥 Export CSV</button>
+        </div>
       </div>
-    </div>
-    <div style="overflow-x:auto">
-      <table id="data-table">
-        <thead>
-          <tr>
-            <th>เวลา</th>
-            <th>PM2.5 (μg/m³)</th>
-            <th>ระดับ</th>
-          </tr>
-        </thead>
-        <tbody id="table-body">
-          <tr><td colspan="3" style="text-align:center">กำลังโหลด...</td></tr>
-        </tbody>
-      </table>
+
+      <div style="overflow-x:auto">
+        <table class="monthly-table" id="monthly-table">
+          <thead>
+            <tr>
+              <th>วัน</th>
+              <th>เช้า<br><small>06:00-12:00</small></th>
+              <th>เที่ยง<br><small>12:00-18:00</small></th>
+              <th>เย็น<br><small>18:00-24:00</small></th>
+              <th>กลางคืน<br><small>00:00-06:00</small></th>
+            </tr>
+          </thead>
+          <tbody id="monthly-body">
+            <tr><td colspan="5" style="text-align:center">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
 </div>
 
 <script>
-  // ✅ ใส่ Sheet ID ของคุณ
   const SHEET_ID = "1PsTBa583AzebRZHGlrq8tqqrjF_UWppfbRT0zKqha8Q";
   const API_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
 
   let allData = [];
   let chart = null;
 
+  // ตั้งเดือนและปีปัจจุบัน (เวลาไทย)
+  const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Bangkok"}));
+  document.getElementById("report-month").value = now.getMonth() + 1;
+  document.getElementById("report-year").textContent = "พ.ศ. " + (now.getFullYear() + 543);
+
   async function loadData() {
     try {
       const res = await fetch(API_URL);
       const text = await res.text();
       const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/)[1]);
-      
+
       allData = json.table.rows
         .filter(row => row.c[0] && row.c[1])
-        .map(row => ({
-          time: row.c[0].v,
-          pm25: parseFloat(row.c[1].v),
-          status: row.c[2] ? row.c[2].v : getStatus(parseFloat(row.c[1].v))
-        }))
+        .map(row => {
+          // แปลง Date object จาก Google Sheets
+          const raw = row.c[0].v;
+          let dt;
+          if (typeof raw === "string" && raw.startsWith("Date(")) {
+            const parts = raw.replace("Date(","").replace(")","").split(",").map(Number);
+            dt = new Date(parts[0], parts[1], parts[2], parts[3]||0, parts[4]||0, parts[5]||0);
+          } else {
+            dt = new Date(raw);
+          }
+          return {
+            dt,
+            timeStr: dt.toLocaleString("th-TH", {timeZone:"Asia/Bangkok"}),
+            pm25: parseFloat(row.c[1].v),
+            status: row.c[2] ? row.c[2].v : getStatus(parseFloat(row.c[1].v))
+          };
+        })
         .reverse();
 
       updateDashboard();
-      document.getElementById("last-update").textContent = 
-        "อัปเดตล่าสุด: " + new Date().toLocaleString("th-TH");
+      renderReport();
+      document.getElementById("last-update").textContent =
+        "อัปเดตล่าสุด: " + now.toLocaleString("th-TH");
     } catch(e) {
       console.error("โหลดข้อมูลไม่สำเร็จ", e);
     }
@@ -150,25 +239,20 @@
 
   function updateDashboard() {
     if (allData.length === 0) return;
-
-    // ค่าปัจจุบัน
     const latest = allData[0];
     document.getElementById("current-pm25").textContent = latest.pm25.toFixed(1);
     const statusEl = document.getElementById("current-status");
     statusEl.textContent = latest.status;
     statusEl.className = "status-badge " + getClass(latest.pm25);
 
-    // สถิติวันนี้
-    const today = new Date().toLocaleDateString("th-TH");
     const todayData = allData.filter(d => {
-      try { return new Date(d.time).toLocaleDateString("th-TH") === today; } 
-      catch { return false; }
+      const thai = new Date(d.dt.toLocaleString("en-US", {timeZone:"Asia/Bangkok"}));
+      return thai.toDateString() === now.toDateString();
     });
-    
-    const values = (todayData.length > 0 ? todayData : allData.slice(0, 24)).map(d => d.pm25);
+    const values = (todayData.length > 0 ? todayData : allData.slice(0,24)).map(d => d.pm25);
     document.getElementById("stat-max").textContent = Math.max(...values).toFixed(1);
     document.getElementById("stat-min").textContent = Math.min(...values).toFixed(1);
-    document.getElementById("stat-avg").textContent = (values.reduce((a,b) => a+b, 0) / values.length).toFixed(1);
+    document.getElementById("stat-avg").textContent = (values.reduce((a,b)=>a+b,0)/values.length).toFixed(1);
 
     filterData();
     updateTable();
@@ -176,17 +260,13 @@
 
   function filterData() {
     const hours = parseInt(document.getElementById("filter-range").value);
-    const filtered = allData.slice(0, hours);
-    updateChart(filtered.reverse());
+    const filtered = allData.slice(0, hours).reverse();
+    updateChart(filtered);
   }
 
   function updateChart(data) {
-    const labels = data.map(d => {
-      try { return new Date(d.time).toLocaleTimeString("th-TH", {hour:"2-digit", minute:"2-digit"}); }
-      catch { return d.time; }
-    });
+    const labels = data.map(d => d.dt.toLocaleTimeString("th-TH", {hour:"2-digit", minute:"2-digit"}));
     const values = data.map(d => d.pm25);
-
     if (chart) chart.destroy();
     chart = new Chart(document.getElementById("pm25Chart"), {
       type: "line",
@@ -207,10 +287,7 @@
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          y: {
-            beginAtZero: true,
-            grid: { color: "rgba(0,0,0,0.05)" }
-          },
+          y: { beginAtZero: true },
           x: { grid: { display: false } }
         }
       }
@@ -219,13 +296,94 @@
 
   function updateTable() {
     const tbody = document.getElementById("table-body");
-    tbody.innerHTML = allData.slice(0, 50).map(d => `
+    tbody.innerHTML = allData.slice(0,50).map(d => `
       <tr>
-        <td>${d.time}</td>
+        <td>${d.timeStr}</td>
         <td><strong>${d.pm25.toFixed(1)}</strong></td>
         <td><span class="status-badge ${getClass(d.pm25)}" style="font-size:12px;padding:4px 10px">${d.status}</span></td>
       </tr>
     `).join("");
+  }
+
+  function renderReport() {
+    const month = parseInt(document.getElementById("report-month").value);
+    const year = now.getFullYear();
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    // อัปเดตปี พ.ศ.
+    document.getElementById("report-year").textContent = "พ.ศ. " + (year + 543);
+
+    // กรองข้อมูลตามเดือนที่เลือก
+    const monthData = allData.filter(d => {
+      const thai = new Date(d.dt.toLocaleString("en-US", {timeZone:"Asia/Bangkok"}));
+      return thai.getFullYear() === year && thai.getMonth() + 1 === month;
+    });
+
+    // จัดกลุ่มตามวัน + ช่วงเวลา
+    const grouped = {};
+    monthData.forEach(d => {
+      const thai = new Date(d.dt.toLocaleString("en-US", {timeZone:"Asia/Bangkok"}));
+      const day = thai.getDate();
+      const hour = thai.getHours();
+      let period;
+      if (hour >= 6 && hour < 12) period = "morning";
+      else if (hour >= 12 && hour < 18) period = "noon";
+      else if (hour >= 18 && hour < 24) period = "evening";
+      else period = "night";
+
+      if (!grouped[day]) grouped[day] = {morning:[], noon:[], evening:[], night:[]};
+      grouped[day][period].push(d);
+    });
+
+    // สร้างตาราง
+    const tbody = document.getElementById("monthly-body");
+    tbody.innerHTML = Array.from({length: daysInMonth}, (_, i) => {
+      const day = i + 1;
+      const data = grouped[day] || {morning:[], noon:[], evening:[], night:[]};
+
+      const renderCell = (arr) => {
+        if (arr.length === 0) return `<span class="no-data">-</span>`;
+        const avg = arr.reduce((a,b) => a + b.pm25, 0) / arr.length;
+        const times = arr.map(d => new Date(d.dt.toLocaleString("en-US", {timeZone:"Asia/Bangkok"}))
+          .toLocaleTimeString("th-TH", {hour:"2-digit", minute:"2-digit"}));
+        const minT = times[times.length-1];
+        const maxT = times[0];
+        return `
+          <div class="time-cell">
+            <div style="font-size:11px;color:#888">${minT}-${maxT}</div>
+            <div class="time-val">${avg.toFixed(1)} μg/m³</div>
+            <span class="status-badge ${getClass(avg)}" style="font-size:10px;padding:2px 8px">${getStatus(avg)}</span>
+          </div>`;
+      };
+
+      return `
+        <tr>
+          <td class="day-col">${day}</td>
+          <td>${renderCell(data.morning)}</td>
+          <td>${renderCell(data.noon)}</td>
+          <td>${renderCell(data.evening)}</td>
+          <td>${renderCell(data.night)}</td>
+        </tr>`;
+    }).join("");
+  }
+
+  function showTab(tab) {
+    document.getElementById("tab-dashboard").style.display = tab === "dashboard" ? "block" : "none";
+    document.getElementById("tab-report").style.display = tab === "report" ? "block" : "none";
+    document.querySelectorAll(".tab").forEach((t,i) => {
+      t.classList.toggle("active", (i===0 && tab==="dashboard") || (i===1 && tab==="report"));
+    });
+  }
+
+  function exportCSV() {
+    const rows = [["Timestamp","PM2.5","Status"]];
+    allData.forEach(d => rows.push([d.timeStr, d.pm25.toFixed(1), d.status]));
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "pm25_report.csv";
+    a.click();
   }
 
   function getStatus(pm25) {
@@ -244,23 +402,8 @@
     else return "hazardous";
   }
 
-  function exportCSV() {
-    const rows = [["Timestamp", "PM2.5", "Status"]];
-    allData.forEach(d => rows.push([d.time, d.pm25.toFixed(1), d.status]));
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "pm25_report.csv";
-    a.click();
-  }
-
-  function exportPDF() {
-    window.print();
-  }
-
   loadData();
-  setInterval(loadData, 60000); // รีเฟรชทุก 1 นาที
+  setInterval(loadData, 60000);
 </script>
 
 </body>
