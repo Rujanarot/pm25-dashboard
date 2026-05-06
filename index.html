@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PM2.5 Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+    .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; text-align: center; }
+    .header h1 { font-size: 24px; }
+    .header p { opacity: 0.8; font-size: 14px; }
+    .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
+    .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+    .current-value { text-align: center; padding: 30px; }
+    .pm25-number { font-size: 72px; font-weight: bold; }
+    .pm25-unit { font-size: 18px; color: #666; }
+    .status-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; color: white; font-size: 16px; margin-top: 10px; }
+    .good { background: #4CAF50; }
+    .moderate { background: #FFC107; color: #333; }
+    .unhealthy { background: #FF9800; }
+    .very-unhealthy { background: #F44336; }
+    .hazardous { background: #9C27B0; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .stat-box { text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+    .stat-value { font-size: 24px; font-weight: bold; color: #667eea; }
+    .stat-label { font-size: 12px; color: #666; margin-top: 5px; }
+    .chart-container { position: relative; height: 300px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #667eea; color: white; padding: 10px; text-align: left; }
+    td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+    tr:hover { background: #f5f5f5; }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; margin: 5px; }
+    .btn-export { background: #4CAF50; color: white; }
+    .btn-refresh { background: #667eea; color: white; }
+    .filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 15px; }
+    select, input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .last-update { text-align: center; color: #666; font-size: 13px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌫️ ระบบตรวจวัด PM2.5</h1>
+  <p id="last-update">กำลังโหลดข้อมูล...</p>
+</div>
+
+<div class="container">
+
+  <!-- ค่าปัจจุบัน -->
+  <div class="card current-value">
+    <div class="pm25-number" id="current-pm25">--</div>
+    <div class="pm25-unit">μg/m³</div>
+    <div class="status-badge" id="current-status">กำลังโหลด...</div>
+  </div>
+
+  <!-- สถิติ -->
+  <div class="card">
+    <h3 style="margin-bottom:15px">📊 สถิติวันนี้</h3>
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-value" id="stat-max">--</div>
+        <div class="stat-label">สูงสุด (μg/m³)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="stat-min">--</div>
+        <div class="stat-label">ต่ำสุด (μg/m³)</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="stat-avg">--</div>
+        <div class="stat-label">เฉลี่ย (μg/m³)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- กราฟ -->
+  <div class="card">
+    <h3 style="margin-bottom:15px">📈 กราฟย้อนหลัง</h3>
+    <div class="filter-row">
+      <select id="filter-range" onchange="filterData()">
+        <option value="24">24 ชั่วโมงล่าสุด</option>
+        <option value="48">48 ชั่วโมงล่าสุด</option>
+        <option value="168">7 วันล่าสุด</option>
+      </select>
+    </div>
+    <div class="chart-container">
+      <canvas id="pm25Chart"></canvas>
+    </div>
+  </div>
+
+  <!-- ตารางข้อมูล + Export -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px">
+      <h3>📋 ข้อมูลย้อนหลัง</h3>
+      <div>
+        <button class="btn btn-refresh" onclick="loadData()">🔄 รีเฟรช</button>
+        <button class="btn btn-export" onclick="exportCSV()">📥 Export CSV</button>
+        <button class="btn btn-export" onclick="exportPDF()">📄 Export PDF</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th>เวลา</th>
+            <th>PM2.5 (μg/m³)</th>
+            <th>ระดับ</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="3" style="text-align:center">กำลังโหลด...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ✅ ใส่ Sheet ID ของคุณ
+  const SHEET_ID = "1PsTBa583AzebRZHGlrq8tqqrjF_UWppfbRT0zKqha8Q";
+  const API_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+  let allData = [];
+  let chart = null;
+
+  async function loadData() {
+    try {
+      const res = await fetch(API_URL);
+      const text = await res.text();
+      const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/)[1]);
+      
+      allData = json.table.rows
+        .filter(row => row.c[0] && row.c[1])
+        .map(row => ({
+          time: row.c[0].v,
+          pm25: parseFloat(row.c[1].v),
+          status: row.c[2] ? row.c[2].v : getStatus(parseFloat(row.c[1].v))
+        }))
+        .reverse();
+
+      updateDashboard();
+      document.getElementById("last-update").textContent = 
+        "อัปเดตล่าสุด: " + new Date().toLocaleString("th-TH");
+    } catch(e) {
+      console.error("โหลดข้อมูลไม่สำเร็จ", e);
+    }
+  }
+
+  function updateDashboard() {
+    if (allData.length === 0) return;
+
+    // ค่าปัจจุบัน
+    const latest = allData[0];
+    document.getElementById("current-pm25").textContent = latest.pm25.toFixed(1);
+    const statusEl = document.getElementById("current-status");
+    statusEl.textContent = latest.status;
+    statusEl.className = "status-badge " + getClass(latest.pm25);
+
+    // สถิติวันนี้
+    const today = new Date().toLocaleDateString("th-TH");
+    const todayData = allData.filter(d => {
+      try { return new Date(d.time).toLocaleDateString("th-TH") === today; } 
+      catch { return false; }
+    });
+    
+    const values = (todayData.length > 0 ? todayData : allData.slice(0, 24)).map(d => d.pm25);
+    document.getElementById("stat-max").textContent = Math.max(...values).toFixed(1);
+    document.getElementById("stat-min").textContent = Math.min(...values).toFixed(1);
+    document.getElementById("stat-avg").textContent = (values.reduce((a,b) => a+b, 0) / values.length).toFixed(1);
+
+    filterData();
+    updateTable();
+  }
+
+  function filterData() {
+    const hours = parseInt(document.getElementById("filter-range").value);
+    const filtered = allData.slice(0, hours);
+    updateChart(filtered.reverse());
+  }
+
+  function updateChart(data) {
+    const labels = data.map(d => {
+      try { return new Date(d.time).toLocaleTimeString("th-TH", {hour:"2-digit", minute:"2-digit"}); }
+      catch { return d.time; }
+    });
+    const values = data.map(d => d.pm25);
+
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById("pm25Chart"), {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label: "PM2.5 (μg/m³)",
+          data: values,
+          borderColor: "#667eea",
+          backgroundColor: "rgba(102,126,234,0.1)",
+          tension: 0.4,
+          fill: true,
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: "rgba(0,0,0,0.05)" }
+          },
+          x: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  function updateTable() {
+    const tbody = document.getElementById("table-body");
+    tbody.innerHTML = allData.slice(0, 50).map(d => `
+      <tr>
+        <td>${d.time}</td>
+        <td><strong>${d.pm25.toFixed(1)}</strong></td>
+        <td><span class="status-badge ${getClass(d.pm25)}" style="font-size:12px;padding:4px 10px">${d.status}</span></td>
+      </tr>
+    `).join("");
+  }
+
+  function getStatus(pm25) {
+    if (pm25 <= 25) return "ดี";
+    else if (pm25 <= 37.5) return "ปานกลาง";
+    else if (pm25 <= 75) return "มีผลต่อสุขภาพ";
+    else if (pm25 <= 150) return "มีผลต่อสุขภาพมาก";
+    else return "อันตราย";
+  }
+
+  function getClass(pm25) {
+    if (pm25 <= 25) return "good";
+    else if (pm25 <= 37.5) return "moderate";
+    else if (pm25 <= 75) return "unhealthy";
+    else if (pm25 <= 150) return "very-unhealthy";
+    else return "hazardous";
+  }
+
+  function exportCSV() {
+    const rows = [["Timestamp", "PM2.5", "Status"]];
+    allData.forEach(d => rows.push([d.time, d.pm25.toFixed(1), d.status]));
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "pm25_report.csv";
+    a.click();
+  }
+
+  function exportPDF() {
+    window.print();
+  }
+
+  loadData();
+  setInterval(loadData, 60000); // รีเฟรชทุก 1 นาที
+</script>
+
+</body>
+</html>
